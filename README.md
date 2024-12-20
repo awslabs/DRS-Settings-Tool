@@ -113,8 +113,8 @@ Extended/Target Account User Permissions:
 
 - The AWS credentials + config file should be updated to have profiles which are named after the account number of each staging and target account. 
     - The credentials and config file are located in the following locations:
-        - Windows: C:\Users\<username>\.aws
-        - Linux: ~/.aws/
+        - Windows: ```C:\Users\<username>\.aws```
+        - Linux: ```~/.aws/```
     - Example of the entries you should have:
       
 credentials file:
