@@ -73,7 +73,7 @@ Staging Account User Permissions:
                 "drs:UpdateReplicationConfiguration",
                 "ec2:CreateSecurityGroup",
                 "ec2:CreateTags",
-		        "ec2:GetEbsDefaultKmsKeyId"
+		"ec2:GetEbsDefaultKmsKeyId"
             ],
             "Resource": "*"
         }
@@ -91,7 +91,7 @@ Extended/Target Account User Permissions:
             "Effect": "Allow",
             "Action": [
                 "drs:DescribeSourceServers",
-		        "drs:GetLaunchConfiguration",
+		"drs:GetLaunchConfiguration",
                 "ec2:DescribeLaunchTemplateVersions",
                 "ec2:DescribeInstanceTypeOfferings",
                 "ec2:DescribeInstances",
