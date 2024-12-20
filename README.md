@@ -17,7 +17,7 @@ This tool was created to help change settings in bulk for multiple Elastic Disas
     - ec2.`<region>`.amazonaws.com
 - IAM user(s) that has the appropriate permissions noted below:
 
-    - For single account use, use the IAM permissions below for the DRS Settings Tool user:
+**For single account use, use the IAM permissions below for the DRS Settings Tool user:**
 ```
 {
     "Version": "2012-10-17",
@@ -52,8 +52,11 @@ This tool was created to help change settings in bulk for multiple Elastic Disas
     ]
 }
 ```
-    - For extended account use, use the IAM permissions below for the DRS Settings Tool users:
-        - Staging Account User Permissions:
+
+**For extended account use, use the IAM permissions below for the DRS Settings Tool users:**
+
+Staging Account User Permissions:
+	
 ```
 {
     "Version": "2012-10-17",
@@ -70,7 +73,7 @@ This tool was created to help change settings in bulk for multiple Elastic Disas
                 "drs:UpdateReplicationConfiguration",
                 "ec2:CreateSecurityGroup",
                 "ec2:CreateTags",
-		        "ec2:GetEbsDefaultKmsKeyId"
+		"ec2:GetEbsDefaultKmsKeyId"
             ],
             "Resource": "*"
         }
@@ -78,7 +81,7 @@ This tool was created to help change settings in bulk for multiple Elastic Disas
 }
 ```
 
-        - Extended/Target Account User Permissions:
+Extended/Target Account User Permissions:
 ```
 {
     "Version": "2012-10-17",
@@ -88,7 +91,7 @@ This tool was created to help change settings in bulk for multiple Elastic Disas
             "Effect": "Allow",
             "Action": [
                 "drs:DescribeSourceServers",
-		        "drs:GetLaunchConfiguration",
+		"drs:GetLaunchConfiguration",
                 "ec2:DescribeLaunchTemplateVersions",
                 "ec2:DescribeInstanceTypeOfferings",
                 "ec2:DescribeInstances",
@@ -106,14 +109,15 @@ This tool was created to help change settings in bulk for multiple Elastic Disas
     ]
 }
 ```
-**PLEASE NOTE**: If you have a mix of extended and non-extended servers, it is best to apply the whole policy to each user for "single account use" guidance above. The above is just an example of minimum required permissions in a basic scenario.
+**PLEASE NOTE**: If you have a mix of extended and non-extended servers, it is best to apply the whole policy to each user for the "single account use" guidance above. The above is just an example of minimum required permissions in a basic scenario.
 
 - The AWS credentials + config file should be updated to have profiles which are named after the account number of each staging and target account. 
     - The credentials and config file are located in the following locations:
         - Windows: C:\Users\<username>\.aws
         - Linux: ~/.aws/
     - Example of the entries you should have:
-        - credentials file:
+      
+credentials file:
 ```
 [<Staging-Account-ID>]
 aws_access_key_id = <Access-Key>
@@ -123,7 +127,8 @@ aws_secret_access_key = <Secret-Key>
 aws_access_key_id = <Access-Key>
 aws_secret_access_key = <Secret-Key>
 ```
-        - config file:
+
+config file:
 ```
 [profile <Staging-Account-ID>]
 region = us-east-1
@@ -134,7 +139,7 @@ region = us-east-1
 output = json 
 ```
 
-**PLEASE NOTE**: The scripts will fail if you do not setup your AWS credentials and config file as noted above.
+**PLEASE NOTE**: The scripts will fail if you do not setup your AWS credentials and config file as noted above, as it relies on this configuration to make API calls to the respective accounts for each setting. For single account use, you can have just one credentials profile and one config entry.
 
 
 ## Installation
