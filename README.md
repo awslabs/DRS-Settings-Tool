@@ -142,7 +142,7 @@ output = json
 
 ## Usage
 1. Ensure you configured your AWS credentials file and are pointing to the correct region. You can do this by setting the appropriate region in your credentials profile specific config settings (noted in the pre-requisites).
-2. Run the "get_settings.py" file. This will create two files in the directory named "DRS_Settings.csv" and "DRS_Settings_DO_NOT_EDIT.csv". **NOTE** Everytime you would like to edit the settings, please ensure you generate the LATEST CSV's by running the "get_settings.py" file.
+2. Run the "get_settings.py" file. You will be prompted to enter the "Target Account ID". The "Target Account" will be the account in which your source servers would launch into during recovery. For single account use, use that single account number. For accounts with DRS source servers that are extended, use the account number where the servers are extended to. This script will create two files in the directory named "DRS_Settings.csv" and "DRS_Settings_DO_NOT_EDIT.csv". **NOTE** Everytime you would like to edit the settings, please ensure you generate the LATEST CSV's by running the "get_settings.py" file.
 3. Open the "DRS_Settings.csv" file in the CSV file editor of choice(Microsoft Excel for example), and make all the desired changes for each source server. **NOTE** It is important that you do NOT modify the "DRS_Settings_DO_NOT_EDIT.csv" file as we will use this as a comparison to limit AWS API calls being made for servers that have not been changed.
 4. Run the "update_settings.py" file to update the settings for all your Source Servers in DRS.
 5. A log will be generated in the directory named "DRS-Update-Tool.log", for troubleshooting purposes.

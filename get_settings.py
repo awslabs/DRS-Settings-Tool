@@ -14,16 +14,15 @@ from utils.clients import drs_client,ec2_client
 from utils.logger import path
 import boto3
 
-drs = boto3.client('drs')
+target_account_nummber = input("Please enter your Target Account ID: ")
+target_session = boto3.Session(profile_name=target_account_nummber)
+drs = target_session.client('drs')
+
 all_settings = []
 
 logger = get_logger('COLLECT')
 def get_settings():
-
-    
-
     try:
-
         source_server_info = []
         sourceInfo = drs.describe_source_servers()
         for item in sourceInfo['items']:
@@ -32,7 +31,6 @@ def get_settings():
             sourceInfo = drs.describe_source_servers(nextToken=sourceInfo['nextToken'])
             for item in sourceInfo['items']:
                 source_server_info.append(item)
-
 
         for server in source_server_info:
 
@@ -86,8 +84,6 @@ def get_settings():
             extended_status = source_server_info_obj.stagingArea['status']
             target_account_id = source_server_info_obj.arn.split(":")[4]
         
-            
-
             #basic launch info
             launch_template_id = basic_launch_settings_obj.ec2LaunchTemplateID
             right_sizing = basic_launch_settings_obj.targetInstanceTypeRightSizingMethod
@@ -99,7 +95,6 @@ def get_settings():
             else:
                 launch_into_instance = basic_launch_settings_obj.launchIntoInstanceProperties['launchIntoEC2InstanceID']
             byol_setting = byol_setting_obj.osByol
-
 
             #launch template info
             target_instance_type = launch_template_settings_obj.InstanceType
