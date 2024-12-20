@@ -6,17 +6,18 @@ This tool was created to help change settings in bulk for multiple Elastic Disas
 ## Prerequisites
 
 - Basic understanding of JSON formatting. Some of the fields that are editable, are presented in JSON format. If they are not formatted correctly, this could cause failures in the tool.
-- Install Python 3. This tool was created and tested with Python 3.10.11 - https://www.python.org/downloads/
-- Install pip - https://pip.pypa.io/en/stable/installation/#get-pip-py
-- Install boto3 - https://boto3.amazonaws.com/v1/documentation/api/latest/guide/quickstart.html
+- Install [Python 3](https://www.python.org/downloads/). This tool was created and tested with Python 3.12.3.
+- Install [pip](https://pip.pypa.io/en/stable/installation/#get-pip-py)
+- Install [boto3](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/quickstart.html) 
 - Active Source Servers in AWS Elastic Disaster Recovery Service
 - Connectivity to the following endpoints for the API calls to succeed:
     - drs.`<region>`.amazonaws.com
     - kms.`<region>`.amazonaws.com
     - iam.`<region>`.amazonaws.com
     - ec2.`<region>`.amazonaws.com
-- A configured AWS credentials file with an IAM user that has the appropriate permissions noted below:
+- IAM user(s) that has the appropriate permissions noted below:
 
+    - For single account use, use the IAM permissions below for the DRS Settings Tool user:
 ```
 {
     "Version": "2012-10-17",
@@ -43,7 +44,33 @@ This tool was created to help change settings in bulk for multiple Elastic Disas
                 "ec2:CreateTags",
                 "iam:GetInstanceProfile",
                 "kms:DescribeKey",
-                "kms:CreateGrant"
+                "kms:CreateGrant",
+                "ec2:GetEbsDefaultKmsKeyId"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
+    - For extended account use, use the IAM permissions below for the DRS Settings Tool users:
+        - Staging Account User Permissions:
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "drs:GetReplicationConfiguration",
+                "kms:DescribeKey",
+                "kms:CreateGrant",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeSubnets",
+                "drs:UpdateReplicationConfiguration",
+                "ec2:CreateSecurityGroup",
+                "ec2:CreateTags",
+		        "ec2:GetEbsDefaultKmsKeyId"
             ],
             "Resource": "*"
         }
@@ -51,12 +78,70 @@ This tool was created to help change settings in bulk for multiple Elastic Disas
 }
 ```
 
+        - Extended/Target Account User Permissions:
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "drs:DescribeSourceServers",
+		        "drs:GetLaunchConfiguration",
+                "ec2:DescribeLaunchTemplateVersions",
+                "ec2:DescribeInstanceTypeOfferings",
+                "ec2:DescribeInstances",
+                "ec2:DescribeKeyPairs",
+                "ec2:DescribeImages",
+                "iam:GetInstanceProfile",
+                "drs:UpdateLaunchConfiguration",
+                "ec2:CreateLaunchTemplateVersion",
+                "ec2:DescribeLaunchTemplateVersions",
+                "ec2:ModifyLaunchTemplate",
+                "ec2:CreateTags"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
+**PLEASE NOTE**: If you have a mix of extended and non-extended servers, it is best to apply the whole policy to each user for "single account use" guidance above. The above is just an example of minimum required permissions in a basic scenario.
+
+- The AWS credentials + config file should be updated to have profiles which are named after the account number of each staging and target account. 
+    - The credentials and config file are located in the following locations:
+        - Windows: C:\Users\<username>\.aws
+        - Linux: ~/.aws/
+    - Example of the entries you should have:
+        - credentials file:
+```
+[<Staging-Account-ID>]
+aws_access_key_id = <Access-Key>
+aws_secret_access_key = <Secret-Key>
+
+[<Target-Account-ID>]
+aws_access_key_id = <Access-Key>
+aws_secret_access_key = <Secret-Key>
+```
+        - config file:
+```
+[profile <Staging-Account-ID>]
+region = us-east-1
+output = json
+
+[profile <Target-Account-ID>]
+region = us-east-1
+output = json 
+```
+
+**PLEASE NOTE**: The scripts will fail if you do not setup your AWS credentials and config file as noted above.
+
 
 ## Installation
 - Clone or download the desired file format locally on the computer in which you have the AWS credentials file configured, and ensure AWS Endpoint connectivity for API calls. 
 
 ## Usage
-1. Ensure you configured your AWS credentials file and are pointing to the correct region. For example, simply using the "aws configure" option with AWS CLI will work in setting both your credentials and region for the AWS API calls to be successful. - https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
+1. Ensure you configured your AWS credentials file and are pointing to the correct region. You can do this by setting the appropriate region in your credentials profile specific config settings (noted in the pre-requisites).
 2. Run the "get_settings.py" file. This will create two files in the directory named "DRS_Settings.csv" and "DRS_Settings_DO_NOT_EDIT.csv". **NOTE** Everytime you would like to edit the settings, please ensure you generate the LATEST CSV's by running the "get_settings.py" file.
 3. Open the "DRS_Settings.csv" file in the CSV file editor of choice(Microsoft Excel for example), and make all the desired changes for each source server. **NOTE** It is important that you do NOT modify the "DRS_Settings_DO_NOT_EDIT.csv" file as we will use this as a comparison to limit AWS API calls being made for servers that have not been changed.
 4. Run the "update_settings.py" file to update the settings for all your Source Servers in DRS.

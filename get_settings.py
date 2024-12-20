@@ -12,10 +12,9 @@ from object_builders.replication_settings_obj_builder import pit_policy_obj_buil
 from utils.logger import get_logger
 from utils.clients import drs_client,ec2_client
 from utils.logger import path
+import boto3
 
-drs = drs_client()
-ec2 = ec2_client()
-
+drs = boto3.client('drs')
 all_settings = []
 
 logger = get_logger('COLLECT')
@@ -24,12 +23,13 @@ def get_settings():
     
 
     try:
+
         source_server_info = []
-        sourceInfo = drs.client.describe_source_servers()
+        sourceInfo = drs.describe_source_servers()
         for item in sourceInfo['items']:
             source_server_info.append(item)
         while 'nextToken' in sourceInfo:
-            sourceInfo = drs.client.describe_source_servers(nextToken=sourceInfo['nextToken'])
+            sourceInfo = drs.describe_source_servers(nextToken=sourceInfo['nextToken'])
             for item in sourceInfo['items']:
                 source_server_info.append(item)
 
@@ -43,15 +43,29 @@ def get_settings():
             #Create object with necessary source server info
             source_server_info_obj = source_server_info_obj_builder_for_csv(server)
 
+            #Get staging area source server ID incase it is extended, we want to make sure we pull the replication settings from the staging account and not extended account
+            if source_server_info_obj.stagingArea['status'] == 'EXTENDED':
+                staging_source_server_id = source_server_info_obj.stagingArea['stagingSourceServerArn'].split('/')[1]
+            else:
+                staging_source_server_id = source_server_info_obj.sourceServerID
+
+            #setting the staging and target boto3 sessions/clients to their respective account ID credentials
+            staging_session = boto3.Session(profile_name=source_server_info_obj.stagingArea['stagingAccountID'])
+            target_session = boto3.Session(profile_name=source_server_info_obj.arn.split(":")[4])
+            drs_staging_client = drs_client(session=staging_session)
+            drs_target_client = drs_client(session=target_session)
+            ec2_staging_client = ec2_client(session=staging_session)
+            ec2_target_client = ec2_client(session=target_session)
+
             #Get API data to build objects with
-            basic_launch_settings_info = drs.client.get_launch_configuration(sourceServerID=source_server_info_obj.sourceServerID)
+            basic_launch_settings_info = drs_target_client.client.get_launch_configuration(sourceServerID=source_server_info_obj.sourceServerID)
 
             #Create object with necessary basic launch settings
             basic_launch_settings_obj = basic_launch_settings_obj_builder_for_csv(basic_launch_settings_info)
             byol_setting_obj = byol_settings_obj_builder_for_csv(basic_launch_settings_obj.licensing)
 
             #Create object with necessary launch template settings
-            launch_template_settings_info = ec2.client.describe_launch_template_versions(LaunchTemplateId=basic_launch_settings_obj.ec2LaunchTemplateID, Versions=['$Default'])
+            launch_template_settings_info = ec2_target_client.client.describe_launch_template_versions(LaunchTemplateId=basic_launch_settings_obj.ec2LaunchTemplateID, Versions=['$Default'])
             launch_template_settings_obj = launch_template_obj_builder_for_csv(launch_template_settings_info)
             instance_role_settings_obj = instance_role_obj_builder_for_csv(launch_template_settings_obj.IamInstanceProfile)
             target_tags_obj = tag_obj_builder_for_csv(launch_template_settings_obj.TagSpecifications)
@@ -59,7 +73,7 @@ def get_settings():
             target_volume_tags_obj = target_tags_obj[1]
 
             #Create object with necessary replication settings
-            replication_settings_info = drs.client.get_replication_configuration(sourceServerID=source_server_info_obj.sourceServerID)
+            replication_settings_info = drs_staging_client.client.get_replication_configuration(sourceServerID=staging_source_server_id)
             replication_settings_obj = replication_settings_obj_builder_for_csv(replication_settings_info)
             pit_policy_obj = pit_policy_obj_builder_for_csv(replication_settings_obj.pitPolicy)
 
@@ -68,6 +82,11 @@ def get_settings():
             hostname = source_server_info_obj.sourceProperties['identificationHints']['hostname']
             server_id = source_server_info_obj.sourceServerID
             recommended_instance_type = source_server_info_obj.sourceProperties['recommendedInstanceType']
+            staging_account_id = source_server_info_obj.stagingArea['stagingAccountID']
+            extended_status = source_server_info_obj.stagingArea['status']
+            target_account_id = source_server_info_obj.arn.split(":")[4]
+        
+            
 
             #basic launch info
             launch_template_id = basic_launch_settings_obj.ec2LaunchTemplateID
@@ -109,7 +128,7 @@ def get_settings():
             use_dedicated_replicator = replication_settings_obj.useDedicatedReplicationServer
             replication_tags = replication_settings_obj.stagingAreaTags
 
-            all_settings.append([hostname, server_id, launch_template_id, right_sizing, copy_private_ip, copy_tags, launch_disposition, launch_into_instance, byol_setting, recommended_instance_type, target_instance_type, target_key_pair, target_ami_id, target_network_settings, target_disk, target_instance_profile_role, target_instance_tags, target_volume_tags, replication_server_default_sg, auto_replicate_new_disks, bandwidth_throttling, create_public_ip_replication_server, use_private_ip_for_replication, default_large_staging_disk_type, pit_policy, replication_instance_type, staging_disk_settings, staging_disk_encryption, staging_disk_encryption_key, replication_server_security_groups, replication_subnet, use_dedicated_replicator, replication_tags])
+            all_settings.append([hostname, server_id, extended_status, "'"+staging_account_id+"'", "'"+target_account_id+"'", launch_template_id, right_sizing, copy_private_ip, copy_tags, launch_disposition, launch_into_instance, byol_setting, recommended_instance_type, target_instance_type, target_key_pair, target_ami_id, target_network_settings, target_disk, target_instance_profile_role, target_instance_tags, target_volume_tags, replication_server_default_sg, auto_replicate_new_disks, bandwidth_throttling, create_public_ip_replication_server, use_private_ip_for_replication, default_large_staging_disk_type, pit_policy, replication_instance_type, staging_disk_settings, staging_disk_encryption, staging_disk_encryption_key, replication_server_security_groups, replication_subnet, use_dedicated_replicator, replication_tags, staging_source_server_id])
     except botocore.exceptions.ClientError as error:
         logger.error(error)
     return all_settings
@@ -131,14 +150,14 @@ def generate_settings_csv():
     with open(file_name, 'w', newline='') as file:
         os.chmod(file_name, 0o644)
         writer = csv.writer(file, delimiter=',')
-        fields = ['Hostname', 'Server ID', 'Launch Template ID', 'Right Sizing', 'Copy Private IP', 'Copy Tags', 'Launch Disposition', 'Launch Into Instance', 'BYOL', 'Recommended Instance Type', 'Target Instance Type', 'Target Key Pair', 'Target AMI ID', 'Target Network Settings', 'Target Disk Settings', 'Target Instance Profile Role', 'Target Instance Tags', 'Target Volume Tags', 'Use Default Replication Security Group', 'Auto Replicate New Disks', 'Bandwidth Throttling', 'Create Public IP for Replication Server', 'Use Private IP for Data Replication', 'Default Large Staging Disk Type', 'PIT Retention Setting(Days)', 'Replication Server Instance Type', 'Staging Disk Settings', 'Staging Disk Encryption', 'Staging Disk Encryption Key Arn', 'Replication Server Security Groups', 'Staging Subnet', 'Use Dedicated Replicator', 'Replication Tags']
+        fields = ['Hostname', 'Server ID', 'Extended Status', 'Staging Account ID', 'Target Account ID', 'Launch Template ID', 'Right Sizing', 'Copy Private IP', 'Copy Tags', 'Launch Disposition', 'Launch Into Instance', 'BYOL', 'Recommended Instance Type', 'Target Instance Type', 'Target Key Pair', 'Target AMI ID', 'Target Network Settings', 'Target Disk Settings', 'Target Instance Profile Role', 'Target Instance Tags', 'Target Volume Tags', 'Use Default Replication Security Group', 'Auto Replicate New Disks', 'Bandwidth Throttling', 'Create Public IP for Replication Server', 'Use Private IP for Data Replication', 'Default Large Staging Disk Type', 'PIT Retention Setting(Days)', 'Replication Server Instance Type', 'Staging Disk Settings', 'Staging Disk Encryption', 'Staging Disk Encryption Key Arn', 'Replication Server Security Groups', 'Staging Subnet', 'Use Dedicated Replicator', 'Replication Tags', 'Staging Source Server ID']
         writer.writerow(fields)
         for item in all_settings:
             writer.writerow(item)
     with open(file_name2, 'w', newline='') as file:
         os.chmod(file_name2, 0o644)
         writer = csv.writer(file, delimiter=',')
-        fields = ['Hostname', 'Server ID', 'Launch Template ID', 'Right Sizing', 'Copy Private IP', 'Copy Tags', 'Launch Disposition', 'Launch Into Instance', 'BYOL', 'Recommended Instance Type', 'Target Key Pair', 'Target Instance Type', 'Target AMI ID', 'Target Network Settings', 'Target Disk Settings', 'Target Instance Profile Role', 'Target Instance Tags', 'Target Volume Tags', 'Use Default Replication Security Group', 'Auto Replicate New Disks', 'Bandwidth Throttling', 'Create Public IP for Replication Server', 'Use Private IP for Data Replication', 'Default Large Staging Disk Type', 'PIT Retention Setting(Days)', 'Replication Server Instance Type', 'Staging Disk Settings', 'Staging Disk Encryption', 'Staging Disk Encryption Key Arn', 'Replication Server Security Groups', 'Staging Subnet', 'Use Dedicated Replicator', 'Replication Tags']
+        fields = ['Hostname', 'Server ID', 'Extended Status', 'Staging Account ID', 'Target Account ID', 'Launch Template ID', 'Right Sizing', 'Copy Private IP', 'Copy Tags', 'Launch Disposition', 'Launch Into Instance', 'BYOL', 'Recommended Instance Type', 'Target Instance Type', 'Target Key Pair', 'Target AMI ID', 'Target Network Settings', 'Target Disk Settings', 'Target Instance Profile Role', 'Target Instance Tags', 'Target Volume Tags', 'Use Default Replication Security Group', 'Auto Replicate New Disks', 'Bandwidth Throttling', 'Create Public IP for Replication Server', 'Use Private IP for Data Replication', 'Default Large Staging Disk Type', 'PIT Retention Setting(Days)', 'Replication Server Instance Type', 'Staging Disk Settings', 'Staging Disk Encryption', 'Staging Disk Encryption Key Arn', 'Replication Server Security Groups', 'Staging Subnet', 'Use Dedicated Replicator', 'Replication Tags', 'Staging Source Server ID']
         writer.writerow(fields)
         for item in all_settings:
             writer.writerow(item)

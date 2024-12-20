@@ -35,19 +35,19 @@ def launch_template_obj_builder(row):
     launch_template_volume_tags_obj = TargetTags(ResourceType='volume')
     launch_template_instance_role_obj = InstanceRoleSettings()
 
-    launch_template_obj.InstanceType = row[10].lower()
-    launch_template_obj.KeyName = row[11]
-    launch_template_obj.ImageId = row[12]
-    launch_template_network_obj = ast.literal_eval(row[13])
+    launch_template_obj.InstanceType = row[13].lower()
+    launch_template_obj.KeyName = row[14]
+    launch_template_obj.ImageId = row[15]
+    launch_template_network_obj = ast.literal_eval(row[16])
     launch_template_obj.NetworkInterfaces = launch_template_network_obj
-    launch_template_disk_obj = ast.literal_eval(row[14])
+    launch_template_disk_obj = ast.literal_eval(row[17])
     launch_template_obj.BlockDeviceMappings = launch_template_disk_obj
-    launch_template_instance_role_obj.Name = row[15]
+    launch_template_instance_role_obj.Name = row[18]
     launch_template_obj.IamInstanceProfile = launch_template_instance_role_obj
 
     launch_template_obj.TagSpecifications = []
-    launch_template_instace_tags_obj.Tags = ast.literal_eval(row[16])
-    launch_template_volume_tags_obj.Tags = ast.literal_eval(row[17])
+    launch_template_instace_tags_obj.Tags = ast.literal_eval(row[19])
+    launch_template_volume_tags_obj.Tags = ast.literal_eval(row[20])
     launch_template_obj.TagSpecifications.append(launch_template_instace_tags_obj)
     launch_template_obj.TagSpecifications.append(launch_template_volume_tags_obj)
 

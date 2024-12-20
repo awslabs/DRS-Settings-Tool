@@ -5,8 +5,11 @@ class boto_client(object):
     client: botocore.client.BaseClient
     service: str
     region: str
-    def __init__(self):
-        self.client = boto3.client(self.service)
+    session: boto3.session
+    
+    def __init__(self, session):
+        self.session = session
+        self.client = self.session.client(self.service)
 
 class drs_client(boto_client):
     service = 'drs'
@@ -19,3 +22,4 @@ class iam_client(boto_client):
 
 class kms_client(boto_client):
     service = 'kms'
+

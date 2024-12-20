@@ -5,7 +5,7 @@ from datetime import datetime
 from utils.clients import ec2_client
 
 
-ec2 = ec2_client()
+#ec2 = ec2_client()
 
 class LaunchTemplateSettings(object):
     def __init__(self, IamInstanceProfile=None, BlockDeviceMappings=None, NetworkInterfaces=None, ImageId=None, InstanceType=None, KeyName=None, TagSpecifications=None,  SecurityGroupIds=None, SecurityGroups=None, **kwargs):
@@ -25,23 +25,23 @@ class LaunchTemplateSettings(object):
     def __ne__(self, other):
         return (self.IamInstanceProfile.__dict__, self.BlockDeviceMappings, self.NetworkInterfaces, self.ImageId, self.InstanceType, self.KeyName, obj_to_dict(self.TagSpecifications[0]), obj_to_dict(self.TagSpecifications[1]), self. SecurityGroupIds, self.SecurityGroups) != (other.IamInstanceProfile.__dict__, other.BlockDeviceMappings, other.NetworkInterfaces, other.ImageId, other.InstanceType, other.KeyName, obj_to_dict(other.TagSpecifications[0]),obj_to_dict(other.TagSpecifications[1]), other. SecurityGroupIds, other.SecurityGroups)
 
-    def update_launch_template(self, launch_template_id, object):
+    def update_launch_template(self, launch_template_id, object, ec2_target_client):
         launch_template_dict = obj_to_dict(object)
         launch_template_settings = delete_none(launch_template_dict)
-        ec2.client.create_launch_template_version(
+        ec2_target_client.client.create_launch_template_version(
             LaunchTemplateId=launch_template_id,
             VersionDescription='DRS-Settings-Updater-' + str(datetime.now()),
             LaunchTemplateData=launch_template_settings
         )
-        self.set_default_version(launch_template_id)
+        self.set_default_version(launch_template_id, ec2_target_client)
 
-    def set_default_version(self, launch_template_id):
-        launch_template_versions = (ec2.client.describe_launch_template_versions(LaunchTemplateId=launch_template_id))['LaunchTemplateVersions']
+    def set_default_version(self, launch_template_id, ec2_target_client):
+        launch_template_versions = (ec2_target_client.client.describe_launch_template_versions(LaunchTemplateId=launch_template_id))['LaunchTemplateVersions']
         latest_version = 0
         for version in launch_template_versions:
             if version['VersionNumber'] > latest_version:
                 latest_version = version['VersionNumber']
-        ec2.client.modify_launch_template(LaunchTemplateId=launch_template_id, DefaultVersion=str(latest_version))
+        ec2_target_client.client.modify_launch_template(LaunchTemplateId=launch_template_id, DefaultVersion=str(latest_version))
     
 
 

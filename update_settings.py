@@ -8,6 +8,8 @@ from object_builders.source_server_info_obj_builder import source_server_info_ob
 from utils.settings_validator import validate_settings
 from utils.logger import get_logger
 from utils.logger import path
+from utils.clients import ec2_client, kms_client, iam_client, drs_client
+import boto3
 
 
 rows1 = []
@@ -33,7 +35,20 @@ def update_settings(file1, file2):
             new_launch_template_obj = launch_template_obj_builder(changes)
             new_replication_settings_obj = replication_settings_obj_builder(changes)
 
-            validate_settings(new_source_server_info_obj, new_drs_launch_settings_obj, new_launch_template_obj, new_replication_settings_obj)
+            # build boto3 clients for each service and account for later calls
+            staging_session = boto3.Session(profile_name=new_source_server_info_obj.stagingArea)
+            target_session = boto3.Session(profile_name=new_source_server_info_obj.arn)
+
+            ec2_staging_client = ec2_client(session=staging_session)
+            ec2_target_client = ec2_client(session=target_session)
+            kms_staging_client = kms_client(session=staging_session)
+            kms_target_client = kms_client(session=target_session)
+            iam_staging_client = iam_client(session=staging_session)
+            iam_target_client = iam_client(session=target_session)
+            drs_staging_client = drs_client(session=staging_session)
+            drs_target_client = drs_client(session=target_session)
+
+            validate_settings(new_source_server_info_obj, new_drs_launch_settings_obj, new_launch_template_obj, new_replication_settings_obj, ec2_staging_client, ec2_target_client, kms_staging_client, iam_target_client)
 
             #build objects from CSV with no changes made
             old_source_server_info_obj = source_server_info_obj_builder(original)
@@ -51,21 +66,21 @@ def update_settings(file1, file2):
 
             if new_drs_launch_settings_obj != old_drs_launch_settings_obj:
                 logger.info("[UPDATE] Updating DRS Launch Settings for Source Server: " + new_source_server_info_obj.sourceServerID)
-                new_drs_launch_settings_obj.update_basic_launch_settings(new_drs_launch_settings_obj)
+                new_drs_launch_settings_obj.update_basic_launch_settings(new_drs_launch_settings_obj, drs_target_client)
             else:
                 logger.info("[NO UPDATE] No changes were made to the DRS Launch Settings.")
             
     
             if new_launch_template_obj != old_launch_template_obj:
                 logger.info("[UPDATE] Updating Launch Template Settings for Source Server: " + new_source_server_info_obj.sourceServerID)
-                new_launch_template_obj.update_launch_template(new_drs_launch_settings_obj.ec2LaunchTemplateID, new_launch_template_obj)
+                new_launch_template_obj.update_launch_template(new_drs_launch_settings_obj.ec2LaunchTemplateID, new_launch_template_obj, ec2_target_client)
             else:
                 logger.info("[NO UPDATE] No changes were made to the Launch Template Settings.")
                 
 
             if new_replication_settings_obj != old_replication_settings_obj:
                 logger.info("[UPDATE] Updating DRS Replication Settings for Source Server: " + new_source_server_info_obj.sourceServerID+"\n__________________________________________________")
-                new_replication_settings_obj.update_replication_settings(new_replication_settings_obj)
+                new_replication_settings_obj.update_replication_settings(new_replication_settings_obj, drs_staging_client)
             else:
                 logger.info("[NO UPDATE] No changes were made to the DRS Replication Settings.\n__________________________________________________")
         logger.info("Updates have been completed. If changes were made, please re-run the get_settings.py script to create the new CSV files with the updated settings")

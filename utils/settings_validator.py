@@ -5,14 +5,10 @@ from utils.logger import get_logger
 from utils.clients import ec2_client, kms_client, iam_client
 from utils.logger import path
 
-ec2 = ec2_client()
-kms = kms_client()
-iam = iam_client()
-
 
 logger = get_logger('VALIDATE')
 
-def validate_settings(source_server_info_obj, drs_launch_settings_obj, launch_template_obj, replication_settings_obj):
+def validate_settings(source_server_info_obj, drs_launch_settings_obj, launch_template_obj, replication_settings_obj, ec2_staging_client, ec2_target_client, kms_staging_client, iam_target_client):
 
 
 
@@ -30,7 +26,7 @@ def validate_settings(source_server_info_obj, drs_launch_settings_obj, launch_te
 
         #Create a dictionary of instance type offerings so we can check if the key(instance type) exists, instead of interating through a list.
         valid_instance_types = {}
-        instance_offerings = ec2.client.describe_instance_type_offerings()
+        instance_offerings = ec2_target_client.client.describe_instance_type_offerings()
         instance_offerings.pop('ResponseMetadata')
         for type in instance_offerings['InstanceTypeOfferings']:
             valid_instance_types[type['InstanceType']] = None 
@@ -55,7 +51,7 @@ def validate_settings(source_server_info_obj, drs_launch_settings_obj, launch_te
 
         if drs_launch_settings_obj.launchIntoInstanceProperties['launchIntoEC2InstanceID'] not in (None, ''):
             try:
-                ec2.client.describe_instances(InstanceIds=[drs_launch_settings_obj.launchIntoInstanceProperties['launchIntoEC2InstanceID']])
+                ec2_target_client.client.describe_instances(InstanceIds=[drs_launch_settings_obj.launchIntoInstanceProperties['launchIntoEC2InstanceID']])
             except botocore.exceptions.ClientError as error:
                 logger.error('[ERROR] Could not validate Launch Into Instance ID: ' + str(error))
                 sys.exit()
@@ -70,21 +66,21 @@ def validate_settings(source_server_info_obj, drs_launch_settings_obj, launch_te
 
         if launch_template_obj.KeyName not in (None, ''):
             try:
-                ec2.client.describe_key_pairs(KeyNames=[launch_template_obj.KeyName])
+                ec2_target_client.client.describe_key_pairs(KeyNames=[launch_template_obj.KeyName])
             except botocore.exceptions.ClientError as error:
                 logger.error('[ERROR] Could not validate Key Pair: ' + str(error))
                 sys.exit()
 
         if launch_template_obj.ImageId not in (None, ''):
             try:
-                ec2.client.describe_images(ImageIds=[launch_template_obj.ImageId])
+                ec2_target_client.client.describe_images(ImageIds=[launch_template_obj.ImageId])
             except botocore.exceptions.ClientError as error:
                 logger.error('[ERROR] Could not validate AMI ID: ' + str(error))
                 sys.exit()
             
         if launch_template_obj.IamInstanceProfile.__dict__['Name'] not in (None, ''):
             try:
-                iam.client.get_instance_profile(InstanceProfileName=launch_template_obj.IamInstanceProfile.__dict__['Name'])
+                iam_target_client.client.get_instance_profile(InstanceProfileName=launch_template_obj.IamInstanceProfile.__dict__['Name'])
             except botocore.exceptions.ClientError as error:
                 logger.error('[ERROR] Could not validate IAM Instance Profile: ' + str(error))
                 sys.exit()
@@ -129,7 +125,7 @@ def validate_settings(source_server_info_obj, drs_launch_settings_obj, launch_te
         if replication_settings_obj.ebsEncryptionKeyArn not in (None, ''):
             key_id = replication_settings_obj.ebsEncryptionKeyArn.split('/')
             try:
-                kms.client.describe_key(KeyId=key_id[1])
+                kms_staging_client.client.describe_key(KeyId=key_id[1])
             except botocore.exceptions.ClientError as error:
                 logger.error('[ERROR] Could not validate KMS ID: ' + str(error))
                 sys.exit()
@@ -137,14 +133,14 @@ def validate_settings(source_server_info_obj, drs_launch_settings_obj, launch_te
 
         if replication_settings_obj.replicationServersSecurityGroupsIDs:
             try:
-                ec2.client.describe_security_groups(GroupIds=replication_settings_obj.replicationServersSecurityGroupsIDs)
+                ec2_staging_client.client.describe_security_groups(GroupIds=replication_settings_obj.replicationServersSecurityGroupsIDs)
             except botocore.exceptions.ClientError as error:
                 logger.error('[ERROR] Could not validate Replication Server Security Groups: ' + str(error))
                 sys.exit()
 
         if replication_settings_obj.stagingAreaSubnetId not in (None, ''):
             try:
-                ec2.client.describe_subnets(SubnetIds=[replication_settings_obj.stagingAreaSubnetId])
+                ec2_staging_client.client.describe_subnets(SubnetIds=[replication_settings_obj.stagingAreaSubnetId])
             except botocore.exceptions.ClientError as error:
                 logger.error('[ERROR] Could not validate Staging Subnet ID: ' + str(error))
                 sys.exit()
